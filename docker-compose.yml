@@ -1,0 +1,47 @@
+services:
+
+  inference:
+    build: .
+    ports:
+      - "8000:8000"
+      - "50051:50051"
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on: 
+      - triton
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      -  "9090:9090" 
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - inference
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - prometheus
+  
+  triton: 
+    image: nvcr.io/nvidia/tritonserver:26.02-py3
+    volumes: 
+      - ./triton_models:/models
+    command: tritonserver --model-repository=/models
+    ports: 
+      - "8080:8000"
+      - "8001:8001"
+      - "8002:8002"
+
+      
+
+volumes:
+  grafana-storage:
+  

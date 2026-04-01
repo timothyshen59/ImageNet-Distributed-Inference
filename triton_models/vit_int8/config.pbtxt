@@ -1,0 +1,35 @@
+# triton_models/vit_int8/config.pbtxt
+
+name: "vit_int8" 
+backend: "onnxruntime" 
+max_batch_size: 16 
+
+input [ 
+    { 
+        name: "input" 
+        data_type: TYPE_FP32
+        dims: [3,224,224]
+    }
+]
+
+output [ 
+    { 
+        name: "output" 
+        data_type: TYPE_FP32 
+        dims: [1000]
+    }
+]
+
+
+dynamic_batching { 
+    preferred_batch_size: [4, 8]
+    max_queue_delay_microseconds: 100000
+}
+
+instance_group [ 
+    {
+        kind: KIND_CPU 
+        count: 4
+    }
+
+]
