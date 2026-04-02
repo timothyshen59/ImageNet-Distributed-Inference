@@ -14,12 +14,20 @@ from scipy.special import softmax
 from app.inference import TritonInferenceSession
 from app.preprocess import preprocess
 from app.metrics import REQUEST_LATENCY, REQUEST_COUNT  
+from app.inference_legacy import LegacyViTInferenceSession 
+from app.batching import Batcher
+
 
 session = TritonInferenceSession() 
 
+legacy_session = LegacyViTInferenceSession()
+legacy_batcher = Batcher(legacy_session)
+
 @asynccontextmanager
-async def lifespan(app: FastAPI): 
-    yield                        # Triton manages its own lifecycle
+async def lifespan(app: FastAPI):
+    legacy_task = asyncio.create_task(legacy_batcher.run())  
+    yield     
+    legacy_task.cancel()
 
 app = FastAPI(lifespan=lifespan) 
 
@@ -59,7 +67,45 @@ async def infer(files: List[UploadFile] = File(...)):
     
     finally: 
         REQUEST_LATENCY.observe(time.time() - start)
+
+
+
+# ── Legacy endpoint (float32 + batcher, no Triton) ───
+@app.post("/inference/v1")
+async def infer_legacy(files: List[UploadFile] = File(...)):
+    start = time.time()
+
+    try:
+        img_bytes_list = await asyncio.gather(*[f.read() for f in files])
+        tensors = [preprocess(b) for b in img_bytes_list]
+
+        results = await asyncio.gather(*[legacy_batcher.infer(t) for t in tensors])
+
+        probs = softmax(np.stack(results), axis=1)
+        indices = np.argmax(probs, axis=1)
+        confidences = np.max(probs, axis=1)
+
+        REQUEST_COUNT.labels(status="success").inc()
+
+        return {
+            "predictions": [
+                {
+                    "filename": files[i].filename,
+                    "predicted_class": int(indices[i]),
+                    "confidence": round(float(confidences[i]), 4)
+                }
+                for i in range(len(files))
+            ]
+        }
+
+    except Exception as e:
+        REQUEST_COUNT.labels(status="error").inc()
+        raise e
+
+    finally:
+        REQUEST_LATENCY.observe(time.time() - start)
         
+
 @app.get("/metrics")
 async def metrics(): 
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
