@@ -1,9 +1,10 @@
-# Run upload_model_s3.sh before 
-
-# terraform/setup.sh
 #!/bin/bash
 set -e 
 set -x 
+
+# Run upload_model_s3.sh before 
+# terraform/setup.sh
+
 
 apt-get update -y 
 apt-get upgrade -y 
@@ -27,14 +28,10 @@ git clone https://github.com/timothyshen59/ImageNet-Distributed-Inference.git /h
 chown -R ubuntu:ubuntu /home/ubuntu/distributedinference
 
 #Model Download from S3 
-mkdir -p /home/ubuntu/distributedinference/triton_models/vit_int8/1 
+BUCKET="${bucket_name}" 
 
-for i in {1..5}; do
-  BUCKET=$(aws s3 ls | grep distributedinference-models | awk '{print $3}')
-  [ -n "$BUCKET" ] && break
-  echo "Waiting for S3 bucket... attempt $i"
-  sleep 5
-done
+mkdir -p /home/ubuntu/distributedinference/triton_models/vit_int8/1
+mkdir -p /home/ubuntu/distributedinference/model
 
 aws s3 cp s3://$BUCKET/triton_models/vit_int8/1/model.onnx \
   /home/ubuntu/distributedinference/triton_models/vit_int8/1/model.onnx

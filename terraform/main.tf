@@ -109,12 +109,15 @@ resource "aws_security_group" "inference" {  # ← fixed: mixed quotes inference
 
 # ── EC2 ──────────────────────────────────────────────
 resource "aws_instance" "inference" {
-  ami                    = "ami-0c55b159cbfafe1f0"
+  ami                    = "ami-0685c90b40d39e754"
   instance_type          = "c5.xlarge"
   key_name               = aws_key_pair.inference.key_name
   vpc_security_group_ids = [aws_security_group.inference.id]
   iam_instance_profile   = aws_iam_instance_profile.inference.name
-  user_data              = file("${path.module}/setup.sh")
+  
+  user_data = templatefile("${path.module}/setup.sh", {
+    bucket_name = aws_s3_bucket.models.bucket   
+  })
 
   root_block_device {
     volume_size = 50
@@ -143,7 +146,8 @@ resource "random_id" "suffix" {
 
 resource "aws_s3_bucket" "models" {
   bucket = "imagenet-distributedinference-${random_id.suffix.hex}"
-
+  force_destroy = true 
+  
   tags = {
     Name = "inference-models"
   }
@@ -163,18 +167,20 @@ resource "aws_iam_role_policy" "s3_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:ListBucket"
-      ]
-      Resource = [
-        aws_s3_bucket.models.arn,
-        "${aws_s3_bucket.models.arn}/*"
-      ]
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+        ]
+        Resource = [
+          aws_s3_bucket.models.arn,
+          "${aws_s3_bucket.models.arn}/*"
+        ]
+      }
+    ]
   })
 }
 
