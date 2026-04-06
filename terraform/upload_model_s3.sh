@@ -1,16 +1,20 @@
 #!/bin/bash
 set -e
 
-BUCKET=$(terraform output -raw bucket_name)
+BUCKET=$(aws s3 ls | grep imagenet-distributedinference | awk '{print $3}')
 
-echo "[upload] Uploading models to s3://$BUCKET..."
+echo "Uploading to s3://$BUCKET..."
 
-# Upload Triton INT8 model
+# Triton INT8 model
 aws s3 cp ../triton_models/vit_int8/1/model.onnx \
   s3://$BUCKET/triton_models/vit_int8/1/model.onnx
 
-# Upload legacy float32 model
+# Triton config  ← ADD THIS, initContainer downloads it too
+aws s3 cp ../triton_models/vit_int8/config.pbtxt \
+  s3://$BUCKET/triton_models/vit_int8/config.pbtxt
+
+# Legacy float32 model
 aws s3 cp ../model/vit_legacy.onnx \
   s3://$BUCKET/model/vit_legacy.onnx
 
-echo "[done] Models uploaded to s3://$BUCKET"
+echo "✅ Done"

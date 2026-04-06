@@ -43,6 +43,6 @@ containerd config default | tee /etc/containerd/config.toml
 sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 systemctl restart containerd
 
-docker pull nvcr.io/nvidia/tritonserver:26.02-py3 &
+docker pull nvcr.io/nvidia/tritonserver:26.02-py3 
 
 echo "Worker base setup complete $(date)" > /home/ubuntu/setup_done.txt

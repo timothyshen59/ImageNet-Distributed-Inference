@@ -4,7 +4,7 @@ set -x
 
 REGION="us-west-2"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-BUCKET=$(aws s3 ls | grep imagenet-distributedinference | awk '{print $3}')
+BUCKET_NAME=$(aws s3 ls | grep imagenet-distributedinference | awk '{print $3}')
 
 echo "Deploying to K8s..."
 
@@ -35,7 +35,7 @@ export AWS_ACCOUNT_ID=$ACCOUNT_ID
 export IMAGE_TAG=latest
 
 envsubst < k8s/fastapi-deployment.yml | kubectl apply -f -
-envsubst < k8s/triton-deployment.yml  | kubectl apply -f -
+kubectl apply -f k8s/triton-deployment.yml
 kubectl apply -f k8s/fastapi-service.yml
 kubectl apply -f k8s/triton-service.yml
 kubectl apply -f k8s/hpa.yml

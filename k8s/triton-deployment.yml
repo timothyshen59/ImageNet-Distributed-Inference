@@ -4,7 +4,7 @@ metadata:
   name: triton
 
 spec:
-  replicas: 2              # ← 1 Triton pod per worker node
+  replicas: 2
 
   selector:
     matchLabels:
@@ -14,7 +14,7 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
-      maxUnavailable: 0    # ← never take Triton down before new one ready
+      maxUnavailable: 0
 
   template:
     metadata:
@@ -22,31 +22,32 @@ spec:
         app: triton
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8002"    # ← Triton metrics port
+        prometheus.io/port: "8002"
 
     spec:
-      # ── spread Triton pods across different nodes ──
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchLabels:
                   app: triton
-              topologyKey: kubernetes.io/hostname    # ← 1 Triton per node
+              topologyKey: kubernetes.io/hostname
 
       imagePullSecrets:
-        - name: ecr-pull-secret                      # ← ECR auth
+        - name: ecr-pull-secret
 
-      # ── model repository from S3 ──────────────────
       initContainers:
         - name: download-model
-          image: amazon/aws-cli:latest               # ← AWS CLI to pull from S3
+          image: amazon/aws-cli:latest
           command:
             - sh
             - -c
             - |
+              mkdir -p /models/vit_int8/1
               aws s3 cp s3://${BUCKET_NAME}/triton_models/vit_int8/1/model.onnx \
                 /models/vit_int8/1/model.onnx
+              aws s3 cp s3://${BUCKET_NAME}/triton_models/vit_int8/config.pbtxt \
+                /models/vit_int8/config.pbtxt
           env:
             - name: BUCKET_NAME
               valueFrom:
@@ -59,54 +60,50 @@ spec:
 
       containers:
         - name: triton
-          # ← full py3 image, no cpu-only tag needed
-          # ← without --gpus flag Triton runs in CPU mode automatically
           image: nvcr.io/nvidia/tritonserver:26.02-py3
-          imagePullPolicy: IfNotPresent    # ← only pull if not cached (7GB image)
+          imagePullPolicy: IfNotPresent
 
           args:
             - tritonserver
-            - --model-repository=/models    # ← points to volume mount
+            - --model-repository=/models
             - --log-verbose=1
 
           ports:
-            - containerPort: 8000    # ← Triton HTTP
+            - containerPort: 8000
               name: http
-            - containerPort: 8001    # ← Triton gRPC (FastAPI connects here)
+            - containerPort: 8001
               name: grpc
-            - containerPort: 8002    # ← Triton metrics (Prometheus scrapes here)
+            - containerPort: 8002
               name: metrics
 
           resources:
             requests:
-              cpu: "1000m"      # ← 1 vCPU guaranteed for Triton
-              memory: "2Gi"     # ← model weights + runtime overhead
+              cpu: "1000m"
+              memory: "2Gi"
             limits:
-              cpu: "2000m"      # ← 2 vCPUs max (c6i.xlarge has 4, split with FastAPI)
-              memory: "4Gi"     # ← hard ceiling
+              cpu: "2000m"
+              memory: "4Gi"
 
           readinessProbe:
             httpGet:
-              path: /v2/health/ready    # ← Triton's health endpoint
+              path: /v2/health/ready
               port: 8000
-            initialDelaySeconds: 60     # ← Triton takes longer to load model
+            initialDelaySeconds: 60
             periodSeconds: 5
-            failureThreshold: 5         # ← more retries, model loading is slow
+            failureThreshold: 5
 
           livenessProbe:
             httpGet:
               path: /v2/health/live
               port: 8000
-            initialDelaySeconds: 90     # ← must be > readinessProbe delay
+            initialDelaySeconds: 90
             periodSeconds: 10
             failureThreshold: 3
 
           volumeMounts:
             - name: model-store
-              mountPath: /models        # ← Triton reads model from here
+              mountPath: /models
 
       volumes:
         - name: model-store
-          emptyDir: {}                  # ← temporary volume, filled by initContainer
-                                        # ← initContainer downloads from S3 → mounts here
-                                        # ← Triton reads from same mount
+          emptyDir: {}
