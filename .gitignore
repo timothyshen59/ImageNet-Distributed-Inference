@@ -1,5 +1,4 @@
-
-# ── Python ───────────────────────────────────────────
+#PyStuff
 __pycache__/
 *.pyc
 *.pyo
@@ -15,14 +14,13 @@ venv/
 env/
 .env
 *.env
+*.csv
 
-
-# ── Mac ──────────────────────────────────────────────
+# Mac 
 .DS_Store
 .AppleDouble
 .LSOverride
 Thumbs.db
-
 
 # Terraform
 terraform/.terraform/
@@ -31,18 +29,15 @@ terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 *.tfstate
 
-
 # Model files
 model/*.onnx
 triton_models/vit_int8/1/model.onnx
 
-
-
-# ── IDE ──────────────────────────────────────────────
+# IDE 
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# ── Docker ───────────────────────────────────────────
+#Docker 
 .dockerignore

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-inference
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: fastapi-inference
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app: fastapi-inference
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: triton
+              topologyKey: kubernetes.io/hostname
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: fastapi-inference
+              topologyKey: kubernetes.io/hostname
+
+      imagePullSecrets:
+        - name: ecr-pull-secret
+
+      containers:
+        - name: fastapi-inference
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/distributedinference:${IMAGE_TAG}
+          imagePullPolicy: Always
+
+          env:
+            - name: TRITON_URL
+              value: "triton-service:8001"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+          ports:
+            - containerPort: 8000
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            failureThreshold: 3

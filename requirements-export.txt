@@ -1,4 +1,4 @@
-# runs export_onnx.py 
+# Packages for export_onnx.py
 torch>=2.10.0
 torchvision>=0.25.0
 timm>=1.0.25

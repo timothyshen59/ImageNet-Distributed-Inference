@@ -1,4 +1,4 @@
-#app/ inference.py
+#app/inference_legacy.py
 
 import onnxruntime as ort 
 import numpy as np 

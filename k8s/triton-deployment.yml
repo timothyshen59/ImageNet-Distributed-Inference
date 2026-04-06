@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triton
+
+spec:
+  replicas: 2              # ← 1 Triton pod per worker node
+
+  selector:
+    matchLabels:
+      app: triton
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0    # ← never take Triton down before new one ready
+
+  template:
+    metadata:
+      labels:
+        app: triton
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"    # ← Triton metrics port
+
+    spec:
+      # ── spread Triton pods across different nodes ──
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: triton
+              topologyKey: kubernetes.io/hostname    # ← 1 Triton per node
+
+      imagePullSecrets:
+        - name: ecr-pull-secret                      # ← ECR auth
+
+      # ── model repository from S3 ──────────────────
+      initContainers:
+        - name: download-model
+          image: amazon/aws-cli:latest               # ← AWS CLI to pull from S3
+          command:
+            - sh
+            - -c
+            - |
+              aws s3 cp s3://${BUCKET_NAME}/triton_models/vit_int8/1/model.onnx \
+                /models/vit_int8/1/model.onnx
+          env:
+            - name: BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secrets
+                  key: bucket_name
+          volumeMounts:
+            - name: model-store
+              mountPath: /models
+
+      containers:
+        - name: triton
+          # ← full py3 image, no cpu-only tag needed
+          # ← without --gpus flag Triton runs in CPU mode automatically
+          image: nvcr.io/nvidia/tritonserver:26.02-py3
+          imagePullPolicy: IfNotPresent    # ← only pull if not cached (7GB image)
+
+          args:
+            - tritonserver
+            - --model-repository=/models    # ← points to volume mount
+            - --log-verbose=1
+
+          ports:
+            - containerPort: 8000    # ← Triton HTTP
+              name: http
+            - containerPort: 8001    # ← Triton gRPC (FastAPI connects here)
+              name: grpc
+            - containerPort: 8002    # ← Triton metrics (Prometheus scrapes here)
+              name: metrics
+
+          resources:
+            requests:
+              cpu: "1000m"      # ← 1 vCPU guaranteed for Triton
+              memory: "2Gi"     # ← model weights + runtime overhead
+            limits:
+              cpu: "2000m"      # ← 2 vCPUs max (c6i.xlarge has 4, split with FastAPI)
+              memory: "4Gi"     # ← hard ceiling
+
+          readinessProbe:
+            httpGet:
+              path: /v2/health/ready    # ← Triton's health endpoint
+              port: 8000
+            initialDelaySeconds: 60     # ← Triton takes longer to load model
+            periodSeconds: 5
+            failureThreshold: 5         # ← more retries, model loading is slow
+
+          livenessProbe:
+            httpGet:
+              path: /v2/health/live
+              port: 8000
+            initialDelaySeconds: 90     # ← must be > readinessProbe delay
+            periodSeconds: 10
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: model-store
+              mountPath: /models        # ← Triton reads model from here
+
+      volumes:
+        - name: model-store
+          emptyDir: {}                  # ← temporary volume, filled by initContainer
+                                        # ← initContainer downloads from S3 → mounts here
+                                        # ← Triton reads from same mount

@@ -42,14 +42,11 @@ class Batcher:
             
             BATCH_SIZE.observe(len(items))
             QUEUE_DEPTH.set(self.queue.qsize())
-            
-            print(f"Processing batch of size: {len(items)}")
              
             batch = np.concatenate([img for img, _ in items], axis=0)
             results = await loop.run_in_executor(
                 self.executor, self.session.run, batch
             )
-            
             
             for i, (_, future) in enumerate(items): 
                 future.set_result(results[i])
