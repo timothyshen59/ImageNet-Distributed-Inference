@@ -7,7 +7,7 @@ import os
 from pathlib import Path 
 
 class TritonInferenceSession: 
-    def __init__(self, url: str = "triton:8001", model_name: str = "vit_int8"): 
+    def __init__(self, url: str = "triton-service:8001", model_name: str = "vit_int8"): 
         self.client = grpcclient.InferenceServerClient(url=url)
         self.model_name = model_name
     

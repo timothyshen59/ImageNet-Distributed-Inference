@@ -27,7 +27,7 @@ kubectl create secret docker-registry ecr-pull-secret \
 kubectl create secret generic aws-secrets \
   --from-literal=account_id=$ACCOUNT_ID \
   --from-literal=region=$REGION \
-  --from-literal=bucket_name=$BUCKET \
+  --from-literal=bucket_name=$BUCKET_NAME \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy

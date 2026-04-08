@@ -20,7 +20,7 @@ aws ecr get-login-password --region $REGION | \
 
 # Build image
 cd ..
-docker build -t $REPO_NAME .
+docker buildx build --platform linux/amd64 -t $REPO_NAME:latest --load .
 
 # Tag + push
 docker tag $REPO_NAME:latest $ECR_URL/$REPO_NAME:$IMAGE_TAG

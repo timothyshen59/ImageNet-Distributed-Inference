@@ -1,25 +1,25 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: triton-service   
+  name: triton-service
   labels:
     app: triton
 
 spec:
   selector:
-    app: triton         
+    app: triton
 
   type: ClusterIP
 
   ports:
     - name: http
-      port: 8000          # Triton 
+      port: 8000
       targetPort: 8000
 
     - name: grpc
-      port: 8001          # FastAPI 
+      port: 8001
       targetPort: 8001
 
     - name: metrics
-      port: 8002          # Prometheus
+      port: 8002
       targetPort: 8002
