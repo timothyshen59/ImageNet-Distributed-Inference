@@ -2,7 +2,7 @@
 
 name: "vit_int8" 
 backend: "onnxruntime" 
-max_batch_size: 16 
+max_batch_size: 64
 
 input [ 
     { 
@@ -22,14 +22,31 @@ output [
 
 
 dynamic_batching { 
-    preferred_batch_size: [4, 8]
-    max_queue_delay_microseconds: 100000
+    preferred_batch_size: [8, 16]
+    max_queue_delay_microseconds: 10000
 }
 
 instance_group [ 
     {
         kind: KIND_CPU 
-        count: 4
+        count: 2
     }
-
 ]
+
+parameters {
+  key: "intra_op_num_threads"
+  value: { string_value: "2" }
+  # threads used WITHIN a single op (e.g. parallelizing a matrix multiply across cores)
+}
+parameters {
+  key: "inter_op_num_threads"
+  value: { string_value: "1" }
+  # threads used BETWEEN independent ops that can run in parallel in the compute graph
+  # kept at 1 since ViT is mostly sequential, little to parallelize between ops
+}
+parameters {
+  key: "enable_mem_arena"
+  value: { string_value: "1" }
+  # pre-allocates a memory pool at startup instead of malloc/free on every inference
+  # reduces allocation overhead under load
+}

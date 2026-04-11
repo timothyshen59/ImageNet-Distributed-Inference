@@ -228,7 +228,7 @@ resource "aws_instance" "master" {
 resource "aws_instance" "worker" {
   count                  = 2
   ami                    = local.ubuntu_ami
-  instance_type          = "c6i.xlarge"
+  instance_type          = "c6i.4xlarge"
   key_name               = aws_key_pair.inference.key_name
   vpc_security_group_ids = [aws_security_group.inference.id]
   iam_instance_profile   = aws_iam_instance_profile.inference.name
@@ -291,4 +291,70 @@ output "ssh_worker1" {
 
 output "ssh_worker2" {
   value = "ssh -i ~/.ssh/inference_key ubuntu@${aws_instance.worker[1].public_ip}"
+}
+
+
+# ── ALB ──────────────────────────────────────────────
+resource "aws_lb" "inference" {
+  name               = "inference-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.inference.id]
+  subnets            = [aws_subnet.inference.id, aws_subnet.inference_2.id]    # ← both subnets
+
+  tags = { Name = "inference-alb" }
+}
+
+
+resource "aws_subnet" "inference_2" {
+  vpc_id                  = aws_vpc.inference.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "us-west-2b"    # ← different AZ
+  map_public_ip_on_launch = true
+  tags = { Name = "inference-subnet-2" }
+}
+
+resource "aws_route_table_association" "inference_2" {
+  subnet_id      = aws_subnet.inference_2.id
+  route_table_id = aws_route_table.inference.id
+}
+
+
+
+resource "aws_lb_target_group" "inference" {
+  name     = "inference-tg"
+  port     = 32459
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.inference.id
+
+  health_check {
+    path                = "/health"
+    port                = "32459"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    interval            = 30
+  }
+}
+
+resource "aws_lb_listener" "inference" {
+  load_balancer_arn = aws_lb.inference.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.inference.arn
+  }
+}
+
+# Register both workers with ALB
+resource "aws_lb_target_group_attachment" "workers" {
+  count            = 2
+  target_group_arn = aws_lb_target_group.inference.arn
+  target_id        = aws_instance.worker[count.index].id
+  port             = 32459
+}
+
+output "alb_dns" {
+  value = aws_lb.inference.dns_name
 }

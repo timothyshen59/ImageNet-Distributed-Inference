@@ -11,7 +11,7 @@ from typing import List
 from scipy.special import softmax
 
 from app.inference import TritonInferenceSession
-from app.preprocess import preprocess
+from app.preprocess import resize, normalize_batch, _POOL
 from app.metrics import REQUEST_LATENCY, REQUEST_COUNT
 from app.inference_legacy import LegacyViTInferenceSession
 from app.batching import Batcher
@@ -34,13 +34,21 @@ app = FastAPI(lifespan=lifespan)
 async def infer(files: List[UploadFile] = File(...)):
     start = time.time()
 
+    
     try:
         img_bytes_list = await asyncio.gather(*[f.read() for f in files])
-        tensors = [preprocess(b) for b in img_bytes_list]
-        batch = np.concatenate(tensors, axis=0)
 
         loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, session.run, batch)
+        imgs = await asyncio.gather(*[
+            loop.run_in_executor(_POOL, resize, b)
+            for b in img_bytes_list
+        ])
+
+        batch = np.stack(imgs, axis=0)
+        batch = normalize_batch(batch)
+ 
+        results = await session.async_run(batch)
+
 
         probs = softmax(results, axis=1)
         indices = np.argmax(probs, axis=1)

@@ -23,7 +23,7 @@ class InferenceUser(HttpUser):
     def infer_triton(self):
         fname, data = random.choice(self.images)
         with self.client.post(
-            "/inference",
+            "/inference/v2",
             files=[("files", (fname, data, "image/jpeg"))],
             catch_response=True
         ) as response:
