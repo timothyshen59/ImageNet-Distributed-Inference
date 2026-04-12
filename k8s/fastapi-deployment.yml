@@ -33,8 +33,10 @@ spec:
                   app: triton
               topologyKey: kubernetes.io/hostname
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100 
+            podAffinityTerm: 
+              labelSelector: 
                 matchLabels:
                   app: fastapi-inference
               topologyKey: kubernetes.io/hostname

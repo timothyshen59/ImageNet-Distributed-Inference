@@ -5,7 +5,7 @@ import tritonclient.grpc as grpcclient
 import numpy as np 
 
 class TritonInferenceSession: 
-    def __init__(self, url: str = "triton:8001", model_name: str = "vit_int8"):
+    def __init__(self, url: str = "triton-service:8001", model_name: str = "vit_int8"):
         self.client = grpcclient.InferenceServerClient(url=url)  # keep sync for health checks
         self.async_client = grpcclient_aio.InferenceServerClient(url=url)
         self.model_name = model_name

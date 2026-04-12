@@ -1,4 +1,6 @@
 #!/bin/bash
+#Push Image to AWS ECR for Deployment 
+
 set -e
 set -x
 

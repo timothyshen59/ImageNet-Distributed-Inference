@@ -34,7 +34,6 @@ app = FastAPI(lifespan=lifespan)
 async def infer(files: List[UploadFile] = File(...)):
     start = time.time()
 
-    
     try:
         img_bytes_list = await asyncio.gather(*[f.read() for f in files])
 

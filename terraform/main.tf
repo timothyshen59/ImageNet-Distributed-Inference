@@ -323,13 +323,13 @@ resource "aws_route_table_association" "inference_2" {
 
 resource "aws_lb_target_group" "inference" {
   name     = "inference-tg"
-  port     = 32459
+  port     = 30000
   protocol = "HTTP"
   vpc_id   = aws_vpc.inference.id
 
   health_check {
     path                = "/health"
-    port                = "32459"
+    port                = "30000"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     interval            = 30
@@ -352,7 +352,7 @@ resource "aws_lb_target_group_attachment" "workers" {
   count            = 2
   target_group_arn = aws_lb_target_group.inference.arn
   target_id        = aws_instance.worker[count.index].id
-  port             = 32459
+  port             = 30000
 }
 
 output "alb_dns" {
